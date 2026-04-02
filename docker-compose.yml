@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: marketdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/2_seed.sql
+
+  model_service:
+    build: 
+      context: ./model_service
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+    volumes:
+      - ./model_service:/app
+      - ./user_files:/app/models # Mount existing local models if available
+
+  backend:
+    build: 
+      context: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_NAME=marketdb
+      - MODEL_SERVICE_URL=http://model_service:8001
+    depends_on:
+      - db
+      - model_service
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build: 
+      context: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
