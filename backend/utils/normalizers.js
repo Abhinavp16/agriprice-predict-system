@@ -11,23 +11,32 @@ const STATE_ALIASES = {
 };
 
 const COMMODITY_ALIASES = {
+    chana: 'gram',
+    chickpea: 'gram',
+    corn: 'maize',
     dhan: 'paddy',
+    gram: 'gram',
+    makka: 'maize',
+    maize: 'maize',
     onion: 'onion',
     paddy: 'paddy',
     potato: 'potato',
     soyabean: 'soybean',
     soybean: 'soybean',
+    tamatar: 'tomato',
     tomato: 'tomato',
     wheat: 'wheat',
 };
 
 const COMMODITY_LABELS = {
-    onion: { en: 'Onion', hi: 'प्याज' },
-    paddy: { en: 'Paddy', hi: 'धान' },
-    potato: { en: 'Potato', hi: 'आलू' },
-    soybean: { en: 'Soybean', hi: 'सोयाबीन' },
-    tomato: { en: 'Tomato', hi: 'टमाटर' },
-    wheat: { en: 'Wheat', hi: 'गेहूं' },
+    gram: { en: 'Gram', hi: '\u091a\u0928\u093e' },
+    maize: { en: 'Maize', hi: '\u092e\u0915\u094d\u0915\u093e' },
+    onion: { en: 'Onion', hi: '\u092a\u094d\u092f\u093e\u091c' },
+    paddy: { en: 'Paddy', hi: '\u0927\u093e\u0928' },
+    potato: { en: 'Potato', hi: '\u0906\u0932\u0942' },
+    soybean: { en: 'Soybean', hi: '\u0938\u094b\u092f\u093e\u092c\u0940\u0928' },
+    tomato: { en: 'Tomato', hi: '\u091f\u092e\u093e\u091f\u0930' },
+    wheat: { en: 'Wheat', hi: '\u0917\u0947\u0939\u0942\u0901' },
 };
 
 function normalizeWhitespace(value) {

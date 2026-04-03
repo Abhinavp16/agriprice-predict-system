@@ -12,6 +12,77 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+STRATEGY_NAME = "historical-weather-v2"
+AVAILABLE_MODELS = [
+    "gram",
+    "maize",
+    "onion",
+    "paddy",
+    "potato",
+    "soybean",
+    "tomato",
+    "wheat",
+]
+
+CROP_WEATHER_RULES = {
+    "gram": {
+        "heavy_rain_mm": 10,
+        "humidity_ceiling": 68,
+        "ideal_temp": (18, 29),
+        "ideal_weekly_precip_mm": 5,
+        "sensitivity": 0.9,
+    },
+    "maize": {
+        "heavy_rain_mm": 16,
+        "humidity_ceiling": 78,
+        "ideal_temp": (22, 32),
+        "ideal_weekly_precip_mm": 16,
+        "sensitivity": 0.8,
+    },
+    "onion": {
+        "heavy_rain_mm": 10,
+        "humidity_ceiling": 72,
+        "ideal_temp": (20, 30),
+        "ideal_weekly_precip_mm": 6,
+        "sensitivity": 0.95,
+    },
+    "paddy": {
+        "heavy_rain_mm": 24,
+        "humidity_ceiling": 90,
+        "ideal_temp": (24, 34),
+        "ideal_weekly_precip_mm": 35,
+        "sensitivity": 0.6,
+    },
+    "potato": {
+        "heavy_rain_mm": 12,
+        "humidity_ceiling": 76,
+        "ideal_temp": (18, 27),
+        "ideal_weekly_precip_mm": 9,
+        "sensitivity": 0.9,
+    },
+    "soybean": {
+        "heavy_rain_mm": 15,
+        "humidity_ceiling": 78,
+        "ideal_temp": (22, 32),
+        "ideal_weekly_precip_mm": 18,
+        "sensitivity": 0.8,
+    },
+    "tomato": {
+        "heavy_rain_mm": 10,
+        "humidity_ceiling": 75,
+        "ideal_temp": (21, 30),
+        "ideal_weekly_precip_mm": 10,
+        "sensitivity": 1.0,
+    },
+    "wheat": {
+        "heavy_rain_mm": 12,
+        "humidity_ceiling": 70,
+        "ideal_temp": (20, 30),
+        "ideal_weekly_precip_mm": 8,
+        "sensitivity": 0.85,
+    },
+}
+
 app = FastAPI(title="Smart Agri Market Model Service")
 
 
@@ -23,6 +94,36 @@ class HistoryPoint(BaseModel):
     modalPrice: float
 
 
+class WeatherPoint(BaseModel):
+    conditionLabel: str | None = None
+    date: str
+    humidity: float | None = None
+    precipitationMm: float | None = None
+    temperatureMax: float | None = None
+    temperatureMin: float | None = None
+    weatherCode: int | None = None
+
+
+class WeatherWindow(BaseModel):
+    averageHumidity: float | None = None
+    averageMaxTemp: float | None = None
+    averageMinTemp: float | None = None
+    rainyDays: int | None = None
+    totalPrecipitation: float | None = None
+
+
+class WeatherSummary(BaseModel):
+    conditionLabel: str | None = None
+    current: WeatherPoint | None = None
+    daily: list[WeatherPoint] = Field(default_factory=list)
+    fetchedAt: str | None = None
+    note: str | None = None
+    resolvedFrom: str | None = None
+    source: str | None = None
+    status: str = "unavailable"
+    window: WeatherWindow | None = None
+
+
 class CandidateMarket(BaseModel):
     district: str
     estimatedDistanceKm: float = 24
@@ -30,6 +131,7 @@ class CandidateMarket(BaseModel):
     marketId: str
     marketName: str
     state: str
+    weather: WeatherSummary | None = None
 
 
 class PredictRequest(BaseModel):
@@ -52,6 +154,11 @@ class ForecastRequest(BaseModel):
     quantity: float | None = None
     state: str
     transportCostPerKm: float | None = None
+    weather: WeatherSummary | None = None
+
+
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    return max(minimum, min(value, maximum))
 
 
 def _mean(values: list[float]) -> float:
@@ -126,14 +233,185 @@ def _build_anomalies(history: list[HistoryPoint]) -> list[dict]:
     return anomalies[-5:]
 
 
+def _weather_days(weather: WeatherSummary | None) -> list[WeatherPoint]:
+    if not weather or not weather.daily:
+        return []
+    return weather.daily[1:8] if len(weather.daily) > 1 else weather.daily[:7]
+
+
+def _temp_score(avg_temp: float, ideal_low: float, ideal_high: float) -> float:
+    center = (ideal_low + ideal_high) / 2
+    tolerance = max((ideal_high - ideal_low) / 2, 1)
+    deviation = abs(avg_temp - center) / tolerance
+    if ideal_low <= avg_temp <= ideal_high:
+        return _clamp(1 - (deviation * 0.35), 0.45, 1.0)
+    return _clamp(0.2 - deviation, -1.0, 0.2)
+
+
+def _precip_score(total_precip: float, ideal_total: float, heavy_rain_days: int) -> float:
+    deviation = abs(total_precip - ideal_total) / max(ideal_total + 4, 8)
+    base_score = 1 - deviation
+    penalty = heavy_rain_days * 0.18
+    return _clamp(base_score - penalty, -1.0, 1.0)
+
+
+def _humidity_score(avg_humidity: float, ceiling: float) -> float:
+    if avg_humidity <= ceiling:
+        return _clamp(1 - ((ceiling - avg_humidity) / max(ceiling, 1)) * 0.2, 0.65, 1.0)
+    excess = (avg_humidity - ceiling) / 10
+    return _clamp(0.2 - excess, -1.0, 0.2)
+
+
+def _analyze_weather(commodity: str, weather: WeatherSummary | None) -> dict:
+    default_summary = {
+        "conditionLabel": weather.conditionLabel if weather else "Weather unavailable",
+        "current": weather.current.model_dump() if weather and weather.current else None,
+        "daily": [day.model_dump() for day in _weather_days(weather)],
+        "fetchedAt": weather.fetchedAt if weather else None,
+        "note": weather.note if weather else "Live weather data is unavailable.",
+        "resolvedFrom": weather.resolvedFrom if weather else None,
+        "source": weather.source if weather else "open-meteo",
+        "status": weather.status if weather else "unavailable",
+        "window": weather.window.model_dump() if weather and weather.window else None,
+    }
+
+    days = _weather_days(weather)
+    if not days or (weather and weather.status == "unavailable"):
+        return {
+            "adjustment": 0.0,
+            "label": "Unavailable",
+            "reason": "Live weather data was unavailable, so the model leaned on price history and arrivals.",
+            "score": 0.0,
+            "summary": default_summary,
+        }
+
+    rules = CROP_WEATHER_RULES.get(commodity, CROP_WEATHER_RULES["wheat"])
+    avg_temp = _mean(
+        [
+            _mean(
+                [
+                    day.temperatureMax or 0,
+                    day.temperatureMin or 0,
+                ]
+            )
+            for day in days
+        ]
+    )
+    total_precip = _mean([day.precipitationMm or 0 for day in days]) * len(days)
+    avg_humidity = _mean([day.humidity or 0 for day in days])
+    heavy_rain_days = sum(1 for day in days if (day.precipitationMm or 0) >= rules["heavy_rain_mm"])
+    current_condition = weather.current.conditionLabel if weather and weather.current else "Clear"
+
+    temp_component = _temp_score(avg_temp, *rules["ideal_temp"])
+    precip_component = _precip_score(total_precip, rules["ideal_weekly_precip_mm"], heavy_rain_days)
+    humidity_component = _humidity_score(avg_humidity, rules["humidity_ceiling"])
+    disruption_penalty = 0.0
+    if current_condition in {"Stormy", "Rainy"}:
+        disruption_penalty += 0.18
+    if current_condition == "Hot":
+        disruption_penalty += 0.1
+
+    score = _clamp(
+        (
+            (temp_component * 0.38)
+            + (precip_component * 0.37)
+            + (humidity_component * 0.25)
+            - disruption_penalty
+        ),
+        -1.0,
+        1.0,
+    )
+    adjustment = round(score * 120 * rules["sensitivity"], 2)
+
+    if score >= 0.3:
+        label = "Favorable"
+    elif score <= -0.2:
+        label = "Risky"
+    else:
+        label = "Mixed"
+
+    if label == "Favorable":
+        reason = (
+            f"Weather looks favorable for {commodity} with {avg_temp:.1f}C average temperature, "
+            f"{total_precip:.1f} mm rain, and humidity near {avg_humidity:.0f}%."
+        )
+    elif label == "Risky":
+        reason = (
+            f"Weather may pressure mandi performance for {commodity}: {heavy_rain_days} heavy-rain day(s), "
+            f"{total_precip:.1f} mm rain, and humidity near {avg_humidity:.0f}%."
+        )
+    else:
+        reason = (
+            f"Weather is mixed for {commodity}, with moderate support from temperature but some pressure from "
+            f"rainfall and humidity."
+        )
+
+    enriched_window = dict(default_summary["window"] or {})
+    enriched_window.update(
+        {
+            "averageHumidity": round(avg_humidity, 1),
+            "averageTemp": round(avg_temp, 1),
+            "heavyRainDays": heavy_rain_days,
+            "totalPrecipitation": round(total_precip, 1),
+        }
+    )
+    default_summary["window"] = enriched_window
+
+    return {
+        "adjustment": adjustment,
+        "label": label,
+        "reason": reason,
+        "score": round(score, 2),
+        "summary": default_summary,
+    }
+
+
+def _daily_weather_modifier(commodity: str, weather_day: WeatherPoint | None) -> float:
+    if not weather_day:
+        return 0.0
+
+    rules = CROP_WEATHER_RULES.get(commodity, CROP_WEATHER_RULES["wheat"])
+    avg_temp = _mean([weather_day.temperatureMax or 0, weather_day.temperatureMin or 0])
+    temp_component = _temp_score(avg_temp, *rules["ideal_temp"])
+    humidity_component = _humidity_score(weather_day.humidity or 0, rules["humidity_ceiling"])
+    precip_component = _precip_score(
+        weather_day.precipitationMm or 0,
+        max(rules["ideal_weekly_precip_mm"] / 7, 1),
+        1 if (weather_day.precipitationMm or 0) >= rules["heavy_rain_mm"] else 0,
+    )
+    return round(
+        _clamp(
+            ((temp_component * 0.34) + (precip_component * 0.38) + (humidity_component * 0.28)),
+            -1.0,
+            1.0,
+        )
+        * 28
+        * rules["sensitivity"],
+        2,
+    )
+
+
+def _effective_volatility_ratio(base_ratio: float, weather_signal: dict) -> float:
+    score = weather_signal["score"]
+    if weather_signal["label"] == "Unavailable":
+        return base_ratio + 0.015
+    if score < 0:
+        return base_ratio + abs(score) * 0.03
+    return max(base_ratio - (score * 0.01), 0.0)
+
+
 def _generate_forecast_points(
+    commodity: str,
     history: list[HistoryPoint],
+    weather: WeatherSummary | None,
     estimated_distance_km: float | None,
     quantity: float | None,
     transport_cost_per_km: float | None,
 ) -> dict:
     prices = [point.modalPrice for point in history]
     arrivals = [point.arrivalQty for point in history]
+    weather_signal = _analyze_weather(commodity, weather)
+    weather_days = weather_signal["summary"]["daily"]
 
     last_price = prices[-1]
     rolling3 = _mean(prices[-3:])
@@ -143,25 +421,37 @@ def _generate_forecast_points(
     avg_arrival = _mean(arrivals[-7:])
     last_arrival = arrivals[-1]
     arrival_pressure = ((avg_arrival - last_arrival) / max(avg_arrival, 1)) * 55
-    baseline = (0.45 * last_price) + (0.3 * rolling3) + (0.25 * rolling7) + arrival_pressure
+    baseline = (
+        (0.45 * last_price)
+        + (0.3 * rolling3)
+        + (0.25 * rolling7)
+        + arrival_pressure
+        + (weather_signal["adjustment"] * 0.42)
+    )
     drift = (momentum * 0.2) + (arrival_pressure * 0.15)
 
     last_date = datetime.strptime(history[-1].date, "%Y-%m-%d")
     current = baseline
     forecast_points = []
     for step in range(1, 8):
+        day_weather = weather_days[step - 1] if len(weather_days) >= step else None
+        weather_adjustment = _daily_weather_modifier(
+            commodity,
+            WeatherPoint(**day_weather) if day_weather else None,
+        )
         mean_reversion = (rolling7 - current) * 0.08
         seasonal = math.sin(step / 2.4) * (volatility * 0.18)
-        predicted = max(100.0, current + drift + mean_reversion + seasonal)
-        band = max(60.0, volatility * 1.05)
-        forecast_points.append(
-            {
-                "forecastDate": (last_date + timedelta(days=step)).strftime("%Y-%m-%d"),
-                "predictedPrice": round(predicted, 2),
-                "lowerBound": round(max(0.0, predicted - band), 2),
-                "upperBound": round(predicted + band, 2),
-            }
-        )
+        predicted = max(100.0, current + drift + mean_reversion + seasonal + weather_adjustment)
+        band = max(60.0, volatility * (1.0 + abs(weather_signal["score"]) * 0.25))
+        point = {
+            "forecastDate": (last_date + timedelta(days=step)).strftime("%Y-%m-%d"),
+            "predictedPrice": round(predicted, 2),
+            "lowerBound": round(max(0.0, predicted - band), 2),
+            "upperBound": round(predicted + band, 2),
+        }
+        if day_weather:
+            point.update(day_weather)
+        forecast_points.append(point)
         current = predicted
 
     avg_price = _mean([point["predictedPrice"] for point in forecast_points])
@@ -174,21 +464,25 @@ def _generate_forecast_points(
         if gross_revenue is not None and profit_transport_cost is not None
         else None
     )
+    effective_ratio = _effective_volatility_ratio(volatility / max(rolling7, 1), weather_signal)
 
     return {
-        "confidenceLabel": _confidence_label(len(history), volatility / max(rolling7, 1)),
+        "confidenceLabel": _confidence_label(len(history), effective_ratio),
         "forecast": forecast_points,
         "profitEstimate": {
             "grossRevenue": gross_revenue,
             "netReturn": net_return,
             "transportCost": profit_transport_cost,
         },
-        "riskLevel": _risk_level(volatility / max(rolling7, 1)),
+        "riskLevel": _risk_level(effective_ratio),
         "summary": {
             "averageForecastPrice": round(avg_price, 2),
             "bestSellDay": best_day,
             "expectedChangePercent": expected_change_percent,
         },
+        "weatherImpactLabel": weather_signal["label"],
+        "weatherImpactScore": weather_signal["score"],
+        "weatherSummary": weather_signal["summary"],
     }
 
 
@@ -198,6 +492,7 @@ def _build_explanation(
     arrivals: list[float],
     predicted_price: float,
     trend_label: str,
+    weather_signal: dict,
 ) -> list[str]:
     last_price = prices[-1]
     rolling7 = _mean(prices[-7:])
@@ -210,17 +505,23 @@ def _build_explanation(
             f"Arrivals are {'below' if last_arrival < avg_arrival else 'above'} the weekly average "
             f"({last_arrival:.0f} vs {avg_arrival:.0f}), which affects price pressure."
         ),
+        weather_signal["reason"],
     ]
 
     if predicted_price > rolling7:
-        explanations.append("Recent momentum and tighter arrivals support a stronger selling window.")
+        explanations.append("Recent momentum and market conditions support a stronger selling window.")
     else:
         explanations.append("Price momentum is moderating, so the forecast favors stable rather than aggressive upside.")
 
-    return explanations[:4]
+    return explanations[:5]
 
 
-def _score_candidate(candidate: CandidateMarket, quantity: float | None, transport_cost_per_km: float | None) -> dict:
+def _score_candidate(
+    candidate: CandidateMarket,
+    commodity: str,
+    quantity: float | None,
+    transport_cost_per_km: float | None,
+) -> dict:
     history = candidate.history
     if len(history) < 5:
         raise ValueError(f"Insufficient history for market {candidate.marketName}")
@@ -232,16 +533,17 @@ def _score_candidate(candidate: CandidateMarket, quantity: float | None, transpo
     rolling7 = _mean(prices[-7:])
     momentum = last_price - prices[-4] if len(prices) >= 4 else 0
     volatility = _std(prices[-7:]) or max(last_price * 0.02, 50)
-    volatility_ratio = volatility / max(rolling7, 1)
     avg_arrival = _mean(arrivals[-7:])
     last_arrival = arrivals[-1]
     arrival_adjustment = ((avg_arrival - last_arrival) / max(avg_arrival, 1)) * 70
+    weather_signal = _analyze_weather(commodity, candidate.weather)
     predicted_price = (
         (0.45 * last_price)
         + (0.25 * rolling3)
         + (0.2 * rolling7)
         + (0.1 * (last_price + momentum))
         + arrival_adjustment
+        + weather_signal["adjustment"]
     )
 
     transport_cost = _transport_cost(transport_cost_per_km, candidate.estimatedDistanceKm)
@@ -252,8 +554,11 @@ def _score_candidate(candidate: CandidateMarket, quantity: float | None, transpo
         else None
     )
     trend_label = _trend_label(prices)
+    volatility_ratio = _effective_volatility_ratio(volatility / max(rolling7, 1), weather_signal)
     forecast_snapshot = _generate_forecast_points(
+        commodity,
         history,
+        candidate.weather,
         candidate.estimatedDistanceKm,
         quantity,
         transport_cost_per_km,
@@ -269,6 +574,7 @@ def _score_candidate(candidate: CandidateMarket, quantity: float | None, transpo
             arrivals,
             predicted_price,
             trend_label,
+            weather_signal,
         ),
         "forecastSummary": forecast_snapshot["summary"],
         "grossRevenue": gross_revenue,
@@ -278,6 +584,9 @@ def _score_candidate(candidate: CandidateMarket, quantity: float | None, transpo
         "predictedPrice": round(predicted_price, 2),
         "recentTrend": trend_label,
         "riskLevel": _risk_level(volatility_ratio),
+        "weatherImpactLabel": weather_signal["label"],
+        "weatherImpactScore": weather_signal["score"],
+        "weatherSummary": weather_signal["summary"],
     }
 
 
@@ -288,7 +597,7 @@ def predict(request: PredictRequest):
             raise ValueError("At least one candidate market is required.")
 
         scored_markets = [
-            _score_candidate(candidate, request.quantity, request.transportCostPerKm)
+            _score_candidate(candidate, request.commodity, request.quantity, request.transportCostPerKm)
             for candidate in request.candidates
         ]
         scored_markets.sort(key=lambda market: market["predictedPrice"], reverse=True)
@@ -303,6 +612,9 @@ def predict(request: PredictRequest):
             "predictedPrice": best_market["predictedPrice"],
             "riskLevel": best_market["riskLevel"],
             "topMarkets": scored_markets[:5],
+            "weatherImpactLabel": best_market["weatherImpactLabel"],
+            "weatherImpactScore": best_market["weatherImpactScore"],
+            "weatherSummary": best_market["weatherSummary"],
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -318,7 +630,9 @@ def forecast(request: ForecastRequest):
             raise ValueError("At least 5 historical data points are required for forecasting.")
 
         result = _generate_forecast_points(
+            request.commodity,
             request.history,
+            request.weather,
             request.estimatedDistanceKm,
             request.quantity,
             request.transportCostPerKm,
@@ -335,13 +649,8 @@ def forecast(request: ForecastRequest):
 @app.get("/models")
 def list_models():
     return {
-        "available_models": [
-            "onion",
-            "paddy",
-            "soybean",
-            "wheat",
-        ],
-        "strategy": "historical-heuristic-v1",
+        "available_models": AVAILABLE_MODELS,
+        "strategy": STRATEGY_NAME,
     }
 
 
@@ -350,5 +659,5 @@ def health_check():
     return {
         "status": "ok",
         "service": "smart-agri-model-service",
-        "strategy": "historical-heuristic-v1",
+        "strategy": STRATEGY_NAME,
     }

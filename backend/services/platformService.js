@@ -1,5 +1,6 @@
 const { getDb } = require('../config/mongo');
 const { forecastMarket, predictMarkets } = require('./modelClient');
+const { getWeatherForMarket } = require('./weatherService');
 const { getCommodityLabels, normalizeCommodity, normalizeState } = require('../utils/normalizers');
 
 const MIN_ACTIVE_RECORDS = 10;
@@ -45,6 +46,16 @@ async function getPriceHistory(db, marketId, commodity, limit = 30) {
     return docs.reverse();
 }
 
+function serializeHistory(history) {
+    return history.map((entry) => ({
+        arrivalQty: entry.arrivalQty,
+        date: entry.date,
+        maxPrice: entry.maxPrice,
+        minPrice: entry.minPrice,
+        modalPrice: entry.modalPrice,
+    }));
+}
+
 function buildTrendLabel(history) {
     if (history.length < 4) {
         return 'Limited history';
@@ -78,6 +89,27 @@ function buildArrivalSummary(history) {
     };
 }
 
+async function buildCandidate(db, market, commodity) {
+    const [history, weather] = await Promise.all([
+        getPriceHistory(db, market._id, commodity, 24),
+        getWeatherForMarket(db, market),
+    ]);
+
+    if (history.length < MIN_ACTIVE_RECORDS) {
+        return null;
+    }
+
+    return {
+        district: market.district,
+        estimatedDistanceKm: market.estimatedDistanceKm || 24,
+        history: serializeHistory(history),
+        marketId: market._id,
+        marketName: market.name,
+        state: market.state,
+        weather,
+    };
+}
+
 async function getCandidatePayload(state, district, commodity) {
     const db = await getDb();
     let searchScope = 'district';
@@ -96,28 +128,8 @@ async function getCandidatePayload(state, district, commodity) {
             .toArray();
     }
 
-    const candidates = [];
-    for (const market of markets) {
-        const history = await getPriceHistory(db, market._id, commodity, 24);
-        if (history.length < MIN_ACTIVE_RECORDS) {
-            continue;
-        }
-
-        candidates.push({
-            district: market.district,
-            estimatedDistanceKm: market.estimatedDistanceKm || 24,
-            history: history.map((entry) => ({
-                arrivalQty: entry.arrivalQty,
-                date: entry.date,
-                maxPrice: entry.maxPrice,
-                minPrice: entry.minPrice,
-                modalPrice: entry.modalPrice,
-            })),
-            marketId: market._id,
-            marketName: market.name,
-            state: market.state,
-        });
-    }
+    const candidates = (await Promise.all(markets.map((market) => buildCandidate(db, market, commodity))))
+        .filter(Boolean);
 
     if (candidates.length === 0) {
         throw badRequest('No market data is available for this commodity in the selected region.');
@@ -221,6 +233,8 @@ async function getComparison(input) {
         searchScope: recommendation.searchScope,
         state: recommendation.state,
         topMarkets: recommendation.topMarkets,
+        weatherImpactLabel: recommendation.weatherImpactLabel,
+        weatherSummary: recommendation.weatherSummary,
     };
 }
 
@@ -235,7 +249,11 @@ async function getMarketDetail(marketId, commodityInput, options = {}) {
         throw error;
     }
 
-    const history = await getPriceHistory(db, marketId, commodity, 30);
+    const [history, weather] = await Promise.all([
+        getPriceHistory(db, marketId, commodity, 30),
+        getWeatherForMarket(db, market),
+    ]);
+
     if (history.length === 0) {
         throw badRequest('No historical data is available for this market and commodity.');
     }
@@ -244,21 +262,15 @@ async function getMarketDetail(marketId, commodityInput, options = {}) {
         commodity,
         district: market.district,
         estimatedDistanceKm: market.estimatedDistanceKm,
-        history: history.map((entry) => ({
-            arrivalQty: entry.arrivalQty,
-            date: entry.date,
-            maxPrice: entry.maxPrice,
-            minPrice: entry.minPrice,
-            modalPrice: entry.modalPrice,
-        })),
+        history: serializeHistory(history),
         marketId: market._id,
         marketName: market.name,
         quantity: maybeNumber(options.quantity),
         state: market.state,
         transportCostPerKm: maybeNumber(options.transportCostPerKm),
+        weather,
     });
 
-    const latest = history[history.length - 1];
     await db.collection('forecasts').deleteMany({ commodity, marketId });
     if (forecast.forecast.length > 0) {
         await db.collection('forecasts').insertMany(
@@ -267,10 +279,12 @@ async function getMarketDetail(marketId, commodityInput, options = {}) {
                 commodity,
                 generatedAt: new Date().toISOString(),
                 marketId,
-                modelVersionId: `${commodity}-forecast-v1`,
+                modelVersionId: `${commodity}-forecast-v2`,
             })),
         );
     }
+
+    const latest = history[history.length - 1];
 
     return {
         arrivals: buildArrivalSummary(history),
@@ -283,17 +297,14 @@ async function getMarketDetail(marketId, commodityInput, options = {}) {
             ...market,
             commodityLabel: getCommodityLabels(commodity).en,
         },
-        priceHistory: history.map((entry) => ({
-            arrivalQty: entry.arrivalQty,
-            date: entry.date,
-            maxPrice: entry.maxPrice,
-            minPrice: entry.minPrice,
-            modalPrice: entry.modalPrice,
-        })),
+        priceHistory: serializeHistory(history),
         profitEstimate: forecast.profitEstimate,
         riskLevel: forecast.riskLevel,
         summary: forecast.summary,
         trendLabel: buildTrendLabel(history),
+        weatherImpactLabel: forecast.weatherImpactLabel,
+        weatherImpactScore: forecast.weatherImpactScore,
+        weatherSummary: forecast.weatherSummary || weather,
     };
 }
 
@@ -307,6 +318,9 @@ async function getForecast(marketId, commodityInput, options = {}) {
         profitEstimate: detail.profitEstimate,
         riskLevel: detail.riskLevel,
         summary: detail.summary,
+        weatherImpactLabel: detail.weatherImpactLabel,
+        weatherImpactScore: detail.weatherImpactScore,
+        weatherSummary: detail.weatherSummary,
     };
 }
 
@@ -356,7 +370,7 @@ async function getAlerts() {
 
 async function getDashboardSummary() {
     const db = await getDb();
-    const [stateDocs, marketCount, totalRecordsIngested, activeModels, alertsCount] =
+    const [stateDocs, marketCount, totalRecordsIngested, activeModels, alertsCount, weatherSnapshots] =
         await Promise.all([
             db.collection('markets').aggregate([
                 {
@@ -372,6 +386,7 @@ async function getDashboardSummary() {
             db.collection('daily_prices').countDocuments(),
             db.collection('model_versions').find({ isActive: true }).sort({ commodity: 1 }).toArray(),
             db.collection('alerts').countDocuments(),
+            db.collection('weather_snapshots').countDocuments(),
         ]);
 
     const activeCommodityIds = await db.collection('daily_prices').distinct('commodity');
@@ -397,6 +412,7 @@ async function getDashboardSummary() {
         })),
         supportedStateCount: stateDocs.length,
         totalRecordsIngested,
+        weatherSnapshotCount: weatherSnapshots,
     };
 }
 
