@@ -236,7 +236,7 @@ def _build_anomalies(history: list[HistoryPoint]) -> list[dict]:
 def _weather_days(weather: WeatherSummary | None) -> list[WeatherPoint]:
     if not weather or not weather.daily:
         return []
-    return weather.daily[1:8] if len(weather.daily) > 1 else weather.daily[:7]
+    return weather.daily[:7]
 
 
 def _temp_score(avg_temp: float, ideal_low: float, ideal_high: float) -> float:

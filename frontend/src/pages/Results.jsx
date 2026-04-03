@@ -1,9 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { AlertCircle, BellPlus, ChevronLeft, TrendingUp } from 'lucide-react';
+import {
+  AlertCircle,
+  BellPlus,
+  ChevronLeft,
+  CloudRain,
+  Droplets,
+  Thermometer,
+  TrendingUp,
+} from 'lucide-react';
 import { api } from '../lib/api';
 import { commodityLabel, formatCurrency, formatNumber, riskClass } from '../lib/formatters';
 import { useI18n } from '../context/I18nContext';
+
+const weatherImpactClass = (label) => {
+  if (label === 'Risky') return 'bg-rose-100 text-rose-700';
+  if (label === 'Mixed') return 'bg-amber-100 text-amber-700';
+  if (label === 'Favorable') return 'bg-emerald-100 text-emerald-700';
+  return 'bg-slate-100 text-slate-600';
+};
+
+const formatTempBand = (point) => {
+  if (point?.temperatureMin === undefined || point?.temperatureMin === null) return '--';
+  if (point?.temperatureMax === undefined || point?.temperatureMax === null) return '--';
+  return `${Math.round(point.temperatureMin)}-${Math.round(point.temperatureMax)}°C`;
+};
 
 const Results = () => {
   const { search } = useLocation();
@@ -94,6 +115,10 @@ const Results = () => {
   }
 
   const bestMarket = data?.topMarkets?.[0];
+  const weatherSummary = data?.weatherSummary;
+  const todayWeather = weatherSummary?.current;
+  const weatherWindow = weatherSummary?.window;
+  const weatherAvailable = weatherSummary?.status && weatherSummary.status !== 'unavailable';
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-fade-in-up">
@@ -121,6 +146,9 @@ const Results = () => {
               <span className="px-4 py-2 rounded-full text-sm font-semibold bg-slate-100 text-slate-700">
                 {t('confidence')}: {data?.confidenceLabel}
               </span>
+              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${weatherImpactClass(data?.weatherImpactLabel)}`}>
+                Weather: {data?.weatherImpactLabel || 'Unavailable'}
+              </span>
               <span className="px-4 py-2 rounded-full text-sm font-semibold bg-primary-50 text-primary-700">
                 Scope: {data?.searchScope}
               </span>
@@ -144,6 +172,51 @@ const Results = () => {
                 <p className="mt-2 font-bold">{formatCurrency(bestMarket?.netReturn)}</p>
               </div>
             </div>
+
+            <div className="mt-6 rounded-2xl bg-white/10 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-white">Weather outlook</p>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${weatherImpactClass(data?.weatherImpactLabel)}`}>
+                  {data?.weatherImpactLabel || 'Unavailable'}
+                </span>
+              </div>
+              {weatherAvailable ? (
+                <>
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div className="rounded-xl bg-white/10 p-3">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Thermometer size={14} />
+                        <span>Today</span>
+                      </div>
+                      <p className="mt-2 font-semibold text-white">{formatTempBand(todayWeather)}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/10 p-3">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <CloudRain size={14} />
+                        <span>Rain</span>
+                      </div>
+                      <p className="mt-2 font-semibold text-white">{formatNumber(weatherWindow?.totalPrecipitation)} mm</p>
+                    </div>
+                    <div className="rounded-xl bg-white/10 p-3">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Droplets size={14} />
+                        <span>Humidity</span>
+                      </div>
+                      <p className="mt-2 font-semibold text-white">{formatNumber(weatherWindow?.averageHumidity)}%</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-300">
+                    {todayWeather?.conditionLabel || weatherSummary?.conditionLabel} outlook from {weatherSummary?.resolvedFrom || 'market'} coordinates.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-slate-300">{weatherSummary?.note || 'Live weather is unavailable for this market right now.'}</p>
+              )}
+              {weatherSummary?.note && weatherAvailable ? (
+                <p className="text-xs text-slate-400">{weatherSummary.note}</p>
+              ) : null}
+            </div>
+
             <Link
               to={`/market/${data?.bestMarketId}?commodity=${requestPayload.commodity}&quantity=${requestPayload.quantity || ''}&transportCostPerKm=${requestPayload.transportCostPerKm || ''}`}
               className="mt-8 block text-center py-3 rounded-2xl bg-white text-slate-900 font-semibold hover:bg-primary-100 transition-colors"
@@ -173,7 +246,7 @@ const Results = () => {
                     <p className="text-sm text-slate-400">Arrival {formatNumber(market.arrivalQty)} qtl</p>
                   </div>
                 </div>
-                <div className="mt-4 grid sm:grid-cols-3 gap-3 text-sm">
+                <div className="mt-4 grid sm:grid-cols-4 gap-3 text-sm">
                   <div className="rounded-xl bg-slate-50 p-3">
                     <p className="text-slate-500">{t('confidence')}</p>
                     <p className="mt-1 font-semibold text-slate-800">{market.confidenceLabel}</p>
@@ -186,6 +259,21 @@ const Results = () => {
                     <p className="text-slate-500">{t('netReturn')}</p>
                     <p className="mt-1 font-semibold text-slate-800">{formatCurrency(market.netReturn)}</p>
                   </div>
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-slate-500">Weather</p>
+                    <p className={`mt-1 inline-flex px-2 py-1 rounded-full font-semibold ${weatherImpactClass(market.weatherImpactLabel)}`}>
+                      {market.weatherImpactLabel || 'Unavailable'}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                  {market.weatherSummary?.status && market.weatherSummary.status !== 'unavailable' ? (
+                    <p>
+                      {market.weatherSummary?.conditionLabel || 'Clear'} · Rain {formatNumber(market.weatherSummary?.window?.totalPrecipitation)} mm · Humidity {formatNumber(market.weatherSummary?.window?.averageHumidity)}%
+                    </p>
+                  ) : (
+                    <p>{market.weatherSummary?.note || 'Weather data unavailable for this market.'}</p>
+                  )}
                 </div>
               </div>
             ))}

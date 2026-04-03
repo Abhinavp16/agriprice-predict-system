@@ -16,6 +16,8 @@ async function ensureIndexes(db) {
 
 async function syncSeedData(db) {
     const seed = getSeedPayload();
+    const activeModelIds = seed.modelVersions.map((modelVersion) => modelVersion._id);
+    const activeCommodities = [...new Set(seed.modelVersions.map((modelVersion) => modelVersion.commodity))];
 
     const marketOps = seed.markets.map((market) => ({
         updateOne: {
@@ -63,8 +65,19 @@ async function syncSeedData(db) {
         db.collection('daily_prices').bulkWrite(priceOps, { ordered: false }),
         db.collection('model_versions').bulkWrite(modelOps, { ordered: false }),
     ]);
+    const deactivatedModels = await db.collection('model_versions').updateMany(
+        {
+            _id: { $nin: activeModelIds },
+            commodity: { $in: activeCommodities },
+            isActive: true,
+        },
+        {
+            $set: { isActive: false },
+        },
+    );
 
     return {
+        deactivatedModelVersions: deactivatedModels.modifiedCount,
         marketUpserts: marketResult.upsertedCount,
         marketUpdates: marketResult.modifiedCount,
         markets: seed.markets.length,

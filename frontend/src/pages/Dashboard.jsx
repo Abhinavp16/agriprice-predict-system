@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Database, Map, Radar } from 'lucide-react';
+import { Activity, CloudRain, Database, Leaf, Map, Radar } from 'lucide-react';
 import { api } from '../lib/api';
 import { formatNumber } from '../lib/formatters';
 import { useI18n } from '../context/I18nContext';
@@ -21,11 +21,16 @@ const Dashboard = () => {
       <section className="glass-panel p-8">
         <p className="text-sm uppercase tracking-[0.24em] text-primary-600 font-semibold">{t('dashboardTitle')}</p>
         <h1 className="mt-4 text-4xl font-black text-slate-900">{t('healthSummary')}</h1>
-        <div className="mt-8 grid md:grid-cols-4 gap-4">
+        <div className="mt-8 grid md:grid-cols-3 xl:grid-cols-6 gap-4">
           <div className="rounded-2xl bg-white/80 border border-slate-200 p-5">
             <Map className="text-primary-600" />
             <p className="mt-4 text-sm text-slate-500">{t('state')}</p>
             <p className="text-2xl font-black text-slate-900">{formatNumber(data.supportedStateCount)}</p>
+          </div>
+          <div className="rounded-2xl bg-white/80 border border-slate-200 p-5">
+            <Leaf className="text-primary-600" />
+            <p className="mt-4 text-sm text-slate-500">Active crops</p>
+            <p className="text-2xl font-black text-slate-900">{formatNumber(data.activeCommodityCount)}</p>
           </div>
           <div className="rounded-2xl bg-white/80 border border-slate-200 p-5">
             <Database className="text-primary-600" />
@@ -41,6 +46,11 @@ const Dashboard = () => {
             <Radar className="text-primary-600" />
             <p className="mt-4 text-sm text-slate-500">Forecast snapshots</p>
             <p className="text-2xl font-black text-slate-900">{formatNumber(data.anomalyCount)}</p>
+          </div>
+          <div className="rounded-2xl bg-white/80 border border-slate-200 p-5">
+            <CloudRain className="text-primary-600" />
+            <p className="mt-4 text-sm text-slate-500">Weather cache</p>
+            <p className="text-2xl font-black text-slate-900">{formatNumber(data.weatherSnapshotCount)}</p>
           </div>
         </div>
       </section>

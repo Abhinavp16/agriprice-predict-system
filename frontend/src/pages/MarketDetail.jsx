@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { AlertTriangle, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CloudRain, Droplets, Thermometer } from 'lucide-react';
 import { api } from '../lib/api';
 import { formatCurrency, formatNumber, riskClass } from '../lib/formatters';
 import { useI18n } from '../context/I18nContext';
@@ -24,6 +24,19 @@ const anomalyDot = ({ cx, cy, payload }) => {
   }
 
   return <circle cx={cx} cy={cy} r={6} fill="#e11d48" stroke="#fff" strokeWidth={2} />;
+};
+
+const weatherImpactClass = (label) => {
+  if (label === 'Risky') return 'bg-rose-100 text-rose-700';
+  if (label === 'Mixed') return 'bg-amber-100 text-amber-700';
+  if (label === 'Favorable') return 'bg-emerald-100 text-emerald-700';
+  return 'bg-slate-100 text-slate-600';
+};
+
+const formatTempBand = (point) => {
+  if (point?.temperatureMin === undefined || point?.temperatureMin === null) return '--';
+  if (point?.temperatureMax === undefined || point?.temperatureMax === null) return '--';
+  return `${Math.round(point.temperatureMin)}-${Math.round(point.temperatureMax)}°C`;
 };
 
 const MarketDetail = () => {
@@ -81,6 +94,16 @@ const MarketDetail = () => {
     ...point,
     isAnomaly: anomalies.some((anomaly) => anomaly.date === point.date),
   }));
+  const weatherSummary = detail?.weatherSummary || forecast?.weatherSummary;
+  const weatherAvailable = weatherSummary?.status && weatherSummary.status !== 'unavailable';
+  const weatherTimeline = (forecast?.forecast || []).map((point) => ({
+    conditionLabel: point.conditionLabel,
+    date: point.forecastDate,
+    humidity: point.humidity,
+    precipitationMm: point.precipitationMm,
+    temperatureMax: point.temperatureMax,
+    temperatureMin: point.temperatureMin,
+  }));
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-fade-in-up">
@@ -103,10 +126,13 @@ const MarketDetail = () => {
             <span className="px-4 py-2 rounded-full text-sm font-semibold bg-slate-100 text-slate-700">
               {t('confidence')}: {detail?.confidenceLabel}
             </span>
+            <span className={`px-4 py-2 rounded-full text-sm font-semibold ${weatherImpactClass(detail?.weatherImpactLabel)}`}>
+              Weather: {detail?.weatherImpactLabel || 'Unavailable'}
+            </span>
           </div>
         </div>
 
-        <div className="mt-8 grid md:grid-cols-4 gap-4">
+        <div className="mt-8 grid md:grid-cols-5 gap-4">
           <div className="rounded-2xl bg-slate-50 p-5">
             <p className="text-sm text-slate-500">{t('latestPrice')}</p>
             <p className="mt-2 text-2xl font-black text-slate-900">{formatCurrency(detail?.latestPrice)}</p>
@@ -122,6 +148,11 @@ const MarketDetail = () => {
           <div className="rounded-2xl bg-slate-50 p-5">
             <p className="text-sm text-slate-500">{t('netReturn')}</p>
             <p className="mt-2 text-2xl font-black text-slate-900">{formatCurrency(forecast?.profitEstimate?.netReturn)}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-5">
+            <p className="text-sm text-slate-500">Weather</p>
+            <p className="mt-2 text-2xl font-black text-slate-900">{weatherSummary?.conditionLabel || 'Unavailable'}</p>
+            <p className="mt-1 text-sm text-slate-500">{formatTempBand(weatherSummary?.current)}</p>
           </div>
         </div>
       </section>
@@ -184,6 +215,50 @@ const MarketDetail = () => {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="glass-panel p-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold text-slate-800">7-day weather outlook</h2>
+          <span className={`px-4 py-2 rounded-full text-sm font-semibold ${weatherImpactClass(detail?.weatherImpactLabel)}`}>
+            {detail?.weatherImpactLabel || 'Unavailable'}
+          </span>
+        </div>
+
+        {weatherAvailable ? (
+          <>
+            <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-7 gap-3">
+              {weatherTimeline.map((point) => (
+                <div key={point.date} className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{point.date}</p>
+                  <p className="mt-2 text-lg font-bold text-slate-900">{point.conditionLabel || 'Clear'}</p>
+                  <div className="mt-4 space-y-2 text-sm text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <Thermometer size={14} className="text-emerald-600" />
+                      <span>{formatTempBand(point)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CloudRain size={14} className="text-sky-600" />
+                      <span>{formatNumber(point.precipitationMm)} mm</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Droplets size={14} className="text-cyan-600" />
+                      <span>{formatNumber(point.humidity)}%</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 text-sm text-slate-600">
+              <p>
+                Forecast weather is resolved from {weatherSummary?.resolvedFrom || 'market'} coordinates and aligned with the same 7-day price forecast window.
+              </p>
+              {weatherSummary?.note ? <p className="mt-2 text-slate-500">{weatherSummary.note}</p> : null}
+            </div>
+          </>
+        ) : (
+          <p className="mt-6 text-slate-500">{weatherSummary?.note || 'Live weather is unavailable for this market right now.'}</p>
+        )}
       </section>
 
       <section className="glass-panel p-7">
