@@ -19,6 +19,6 @@
   }
 
   .btn-primary {
-    @apply px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl shadow-lg shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0;
+    @apply px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl shadow-lg shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 inline-flex items-center gap-2;
   }
 }
