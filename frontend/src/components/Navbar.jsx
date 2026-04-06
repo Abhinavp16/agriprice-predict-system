@@ -11,8 +11,8 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-2">
-            <div className="bg-primary-100 p-2 rounded-xl text-primary-600">
-              <Leaf size={24} strokeWidth={2.5} />
+            <div className="p-0.5 rounded-xl">
+              <img src="/logo.png" alt="AgriPulse Logo" className="w-10 h-10 object-contain" />
             </div>
             <div>
               <Link to="/" className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-indigo-600">

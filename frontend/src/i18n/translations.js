@@ -1,6 +1,6 @@
 export const translations = {
   en: {
-    appName: 'Smart Agri Market IQ',
+    appName: 'AgriPulse',
     alerts: 'Alerts',
     bestMarket: 'Best mandi recommendation',
     changeLanguage: 'हिंदी',
@@ -23,7 +23,7 @@ export const translations = {
     latestPrice: 'Latest modal price',
     marketDetails: 'View market details',
     modelVersions: 'Active model versions',
-    navSubtitle: 'Madhya Pradesh + Chhattisgarh',
+    navSubtitle: 'Mandi Rates & Prediction',
     netReturn: 'Estimated net return',
     noAlerts: 'No alerts have been created yet.',
     noData: 'No data available',
@@ -47,7 +47,7 @@ export const translations = {
     watchlist: 'Alert watchlist',
   },
   hi: {
-    appName: 'स्मार्ट एग्री मार्केट आईक्यू',
+    appName: 'एग्रीपल्स',
     alerts: 'अलर्ट',
     bestMarket: 'सबसे अच्छा मंडी सुझाव',
     changeLanguage: 'English',
@@ -70,7 +70,7 @@ export const translations = {
     latestPrice: 'नवीनतम मॉडल मूल्य',
     marketDetails: 'मंडी विवरण देखें',
     modelVersions: 'सक्रिय मॉडल संस्करण',
-    navSubtitle: 'मध्य प्रदेश + छत्तीसगढ़',
+    navSubtitle: 'मंडी भाव और पूर्वानुमान',
     netReturn: 'अनुमानित शुद्ध लाभ',
     noAlerts: 'अभी तक कोई अलर्ट नहीं बनाया गया है।',
     noData: 'डेटा उपलब्ध नहीं है',
