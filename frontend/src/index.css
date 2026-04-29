@@ -5,20 +5,26 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased font-sans;
+    @apply text-slate-900 antialiased font-sans min-h-screen;
+    background: linear-gradient(135deg, #f8fafc 0%, #f0fdf4 50%, #f0f9ff 100%);
+    background-attachment: fixed;
   }
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl;
+    @apply bg-white/60 backdrop-blur-xl border border-white/40 shadow-2xl rounded-3xl transition-all duration-300;
+  }
+  
+  .glass-panel:hover {
+    @apply shadow-emerald-500/10 border-white/60 -translate-y-0.5;
   }
 
   .input-field {
-    @apply w-full px-4 py-3 rounded-xl border border-slate-200 bg-white/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all duration-300;
+    @apply w-full px-4 py-3 rounded-2xl border border-slate-200/60 bg-white/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all duration-300;
   }
 
   .btn-primary {
-    @apply px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl shadow-lg shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 inline-flex items-center gap-2;
+    @apply px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-1 active:translate-y-0 inline-flex items-center gap-2;
   }
 }
