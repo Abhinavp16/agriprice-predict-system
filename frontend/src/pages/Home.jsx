@@ -90,16 +90,7 @@ const Home = () => {
               <p className="mt-2 text-lg font-bold text-slate-800">2 States</p>
               <p className="text-sm text-slate-500">Madhya Pradesh and Chhattisgarh</p>
             </div>
-            <div className="rounded-2xl bg-white/75 border border-slate-200 p-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold">{t('forecast')}</p>
-              <p className="mt-2 text-lg font-bold text-slate-800">7 Days</p>
-              <p className="text-sm text-slate-500">Forecast and best-sell-day insight</p>
-            </div>
-            <div className="rounded-2xl bg-white/75 border border-slate-200 p-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold">{t('alerts')}</p>
-              <p className="mt-2 text-lg font-bold text-slate-800">Live Watchlist</p>
-              <p className="text-sm text-slate-500">Save target-price alerts in-app</p>
-            </div>
+
           </div>
         </div>
 
