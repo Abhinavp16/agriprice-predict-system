@@ -143,12 +143,6 @@ const Results = () => {
               <span className={`px-4 py-2 rounded-full text-sm font-semibold ${riskClass(data?.riskLevel)}`}>
                 {t('risk')}: {data?.riskLevel}
               </span>
-              <span className="px-4 py-2 rounded-full text-sm font-semibold bg-slate-100 text-slate-700">
-                {t('confidence')}: {data?.confidenceLabel}
-              </span>
-              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${weatherImpactClass(data?.weatherImpactLabel)}`}>
-                Weather: {data?.weatherImpactLabel || 'Unavailable'}
-              </span>
               <span className="px-4 py-2 rounded-full text-sm font-semibold bg-primary-50 text-primary-700">
                 Scope: {data?.searchScope}
               </span>

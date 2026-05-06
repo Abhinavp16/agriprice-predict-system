@@ -186,7 +186,7 @@ const Home = () => {
         <div className="glass-panel p-6">
           <MapPinned className="text-primary-600" />
           <h3 className="mt-4 text-xl font-bold text-slate-800">State-aware recommendations</h3>
-          <p className="mt-2 text-slate-600">District-first mandi selection built for MP and Chhattisgarh.</p>
+          <p className="mt-2 text-slate-600">District-first mandi selection built for  Chhattisgarh.</p>
         </div>
         <div className="glass-panel p-6">
           <ArrowRightLeft className="text-primary-600" />
