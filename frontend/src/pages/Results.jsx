@@ -152,53 +152,49 @@ const Results = () => {
             </ul>
           </div>
 
-          <div className="rounded-3xl bg-slate-900 text-white p-7 shadow-2xl">
-            <p className="text-sm uppercase tracking-[0.24em] text-slate-400">{t('predictedPrice')}</p>
-            <p className="mt-3 text-5xl font-black">{formatCurrency(data?.predictedPrice)}</p>
-            <p className="mt-2 text-slate-400">per quintal</p>
-            <div className="mt-8 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="text-slate-400">{t('grossRevenue')}</p>
-                <p className="mt-2 font-bold">{formatCurrency(bestMarket?.grossRevenue)}</p>
+          <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8 shadow-2xl border border-white/10 relative overflow-hidden group">
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary-500/20 rounded-full blur-3xl group-hover:bg-primary-500/30 transition-all duration-700" />
+            <div className="relative z-10">
+              <p className="text-sm uppercase tracking-[0.24em] text-slate-400 font-medium">{t('predictedPrice')}</p>
+              <p className="mt-4 text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200">{formatCurrency(data?.predictedPrice)}</p>
+              <p className="mt-2 text-slate-400 font-medium">per quintal</p>
+              <div className="mt-8 grid grid-cols-2 gap-4 text-sm">
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-5 backdrop-blur-md hover:bg-white/10 transition-colors">
+                  <p className="text-slate-400 font-medium">{t('grossRevenue')}</p>
+                  <p className="mt-2 text-lg font-bold text-white">{formatCurrency(bestMarket?.grossRevenue)}</p>
+                </div>
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-5 backdrop-blur-md hover:bg-white/10 transition-colors">
+                  <p className="text-slate-400 font-medium">{t('netReturn')}</p>
+                  <p className="mt-2 text-lg font-bold text-emerald-400">{formatCurrency(bestMarket?.netReturn)}</p>
+                </div>
               </div>
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="text-slate-400">{t('netReturn')}</p>
-                <p className="mt-2 font-bold">{formatCurrency(bestMarket?.netReturn)}</p>
-              </div>
-            </div>
 
-            <div className="mt-6 rounded-2xl bg-white/10 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-white">Weather outlook</p>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${weatherImpactClass(data?.weatherImpactLabel)}`}>
-                  {data?.weatherImpactLabel || 'Unavailable'}
-                </span>
-              </div>
-              {weatherAvailable ? (
-                <>
-                  <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div className="rounded-xl bg-white/10 p-3">
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <Thermometer size={14} />
-                        <span>Today</span>
+              <div className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-5 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-white tracking-wide">Weather outlook</p>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${weatherImpactClass(data?.weatherImpactLabel)}`}>
+                    {data?.weatherImpactLabel || 'Unavailable'}
+                  </span>
+                </div>
+                {weatherAvailable ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      <div className="rounded-xl bg-white/5 border border-white/5 p-3 flex flex-col items-center justify-center text-center hover:bg-white/10 transition-colors">
+                        <Thermometer size={16} className="text-rose-300 mb-1" />
+                        <span className="text-xs text-slate-400">Today</span>
+                        <p className="mt-1 font-semibold text-white">{formatTempBand(todayWeather)}</p>
                       </div>
-                      <p className="mt-2 font-semibold text-white">{formatTempBand(todayWeather)}</p>
-                    </div>
-                    <div className="rounded-xl bg-white/10 p-3">
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <CloudRain size={14} />
-                        <span>Rain</span>
+                      <div className="rounded-xl bg-white/5 border border-white/5 p-3 flex flex-col items-center justify-center text-center hover:bg-white/10 transition-colors">
+                        <CloudRain size={16} className="text-blue-300 mb-1" />
+                        <span className="text-xs text-slate-400">Rain</span>
+                        <p className="mt-1 font-semibold text-white">{formatNumber(weatherWindow?.totalPrecipitation)} mm</p>
                       </div>
-                      <p className="mt-2 font-semibold text-white">{formatNumber(weatherWindow?.totalPrecipitation)} mm</p>
-                    </div>
-                    <div className="rounded-xl bg-white/10 p-3">
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <Droplets size={14} />
-                        <span>Humidity</span>
+                      <div className="rounded-xl bg-white/5 border border-white/5 p-3 flex flex-col items-center justify-center text-center hover:bg-white/10 transition-colors">
+                        <Droplets size={16} className="text-cyan-300 mb-1" />
+                        <span className="text-xs text-slate-400">Humidity</span>
+                        <p className="mt-1 font-semibold text-white">{formatNumber(weatherWindow?.averageHumidity)}%</p>
                       </div>
-                      <p className="mt-2 font-semibold text-white">{formatNumber(weatherWindow?.averageHumidity)}%</p>
                     </div>
-                  </div>
                   <p className="text-sm text-slate-300">
                     {todayWeather?.conditionLabel || weatherSummary?.conditionLabel} outlook from {weatherSummary?.resolvedFrom || 'market'} coordinates.
                   </p>
@@ -206,17 +202,16 @@ const Results = () => {
               ) : (
                 <p className="text-sm text-slate-300">{weatherSummary?.note || 'Live weather is unavailable for this market right now.'}</p>
               )}
-              {weatherSummary?.note && weatherAvailable ? (
-                <p className="text-xs text-slate-400">{weatherSummary.note}</p>
-              ) : null}
-            </div>
+                ) : null}
+              </div>
 
-            <Link
-              to={`/market/${data?.bestMarketId}?commodity=${requestPayload.commodity}&quantity=${requestPayload.quantity || ''}&transportCostPerKm=${requestPayload.transportCostPerKm || ''}`}
-              className="mt-8 block text-center py-3 rounded-2xl bg-white text-slate-900 font-semibold hover:bg-primary-100 transition-colors"
-            >
-              {t('marketDetails')}
-            </Link>
+              <Link
+                to={`/market/${data?.bestMarketId}?commodity=${requestPayload.commodity}&quantity=${requestPayload.quantity || ''}&transportCostPerKm=${requestPayload.transportCostPerKm || ''}`}
+                className="mt-8 block text-center py-3.5 rounded-2xl bg-white text-slate-900 font-bold hover:bg-primary-50 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300"
+              >
+                {t('marketDetails')}
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -229,15 +224,15 @@ const Results = () => {
           </div>
           <div className="space-y-4">
             {(data?.topMarkets || []).map((market) => (
-              <div key={market.marketId} className="rounded-2xl border border-slate-200 bg-white/80 p-5">
+              <div key={market.marketId} className="rounded-2xl border border-white/60 bg-white/60 hover:bg-white/80 p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900">{market.marketName}</h3>
-                    <p className="mt-1 text-slate-500">{market.recentTrend} · {t('risk')}: {market.riskLevel}</p>
+                    <h3 className="text-xl font-bold text-slate-900 group-hover:text-primary-700 transition-colors">{market.marketName}</h3>
+                    <p className="mt-1 text-slate-500 font-medium">{market.recentTrend} · <span className="text-slate-400">{t('risk')}: {market.riskLevel}</span></p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-black text-primary-700">{formatCurrency(market.predictedPrice)}</p>
-                    <p className="text-sm text-slate-400">Arrival {formatNumber(market.arrivalQty)} qtl</p>
+                    <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-emerald-500">{formatCurrency(market.predictedPrice)}</p>
+                    <p className="text-sm text-slate-400 font-medium">Arrival {formatNumber(market.arrivalQty)} qtl</p>
                   </div>
                 </div>
                 <div className="mt-4 grid sm:grid-cols-4 gap-3 text-sm">

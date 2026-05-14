@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,25 +6,25 @@
 @layer base {
   body {
     @apply text-slate-900 antialiased font-sans min-h-screen;
-    background: linear-gradient(135deg, #f8fafc 0%, #f0fdf4 50%, #f0f9ff 100%);
+    background: linear-gradient(135deg, #f0fdf4 0%, #ccfbf1 50%, #e0f2fe 100%);
     background-attachment: fixed;
   }
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-white/60 backdrop-blur-xl border border-white/40 shadow-2xl rounded-3xl transition-all duration-300;
+    @apply bg-white/70 backdrop-blur-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)] rounded-3xl transition-all duration-500 ease-out;
   }
   
   .glass-panel:hover {
-    @apply shadow-emerald-500/10 border-white/60 -translate-y-0.5;
+    @apply shadow-[0_16px_48px_rgba(16,185,129,0.12)] border-white/80 -translate-y-1;
   }
 
   .input-field {
-    @apply w-full px-4 py-3 rounded-2xl border border-slate-200/60 bg-white/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all duration-300;
+    @apply w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white/80 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-300;
   }
 
   .btn-primary {
-    @apply px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-1 active:translate-y-0 inline-flex items-center gap-2;
+    @apply px-6 py-3.5 bg-gradient-to-r from-primary-500 to-emerald-400 hover:from-primary-600 hover:to-emerald-500 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-primary-500/40 active:translate-y-0 active:shadow-md inline-flex items-center gap-2;
   }
 }
